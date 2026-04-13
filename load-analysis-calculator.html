@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Load First — Power Sizing Calculator</title>
+  <style>
+    :root {
+      --bg: #050030;
+      --panel: #19243d;
+      --panel-2: #1f2430;
+      --text: #edf2f7;
+      --muted: #a0aec0;
+      --accent: #fffb00;
+      --accent-2: #f6ad55;
+      --danger: #fc8181;
+      --ok: #68d391;
+      --border: #2d3748;
+      --shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #020020, #11151d 40%, #121822);
+      color: var(--text);
+    }
+    .wrap { max-width: 1320px; margin: 0 auto; padding: 24px; }
+    .hero {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 22px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 2rem; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.5; max-width: 760px; }
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border);
+      background: rgba(23,26,33,.94); border-radius: 999px; color: var(--accent); font-size: 0.9rem; white-space: nowrap;
+    }
+    .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+    .panel {
+      background: rgba(23,26,33,.94); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .panel .head { padding: 18px 18px 8px; border-bottom: 1px solid rgba(255,255,255,.04); }
+    .panel .head h2, .panel .head h3 { margin: 0 0 4px; font-size: 1.05rem; }
+    .panel .head p { margin: 0; color: var(--muted); font-size: .94rem; }
+    .panel .body { padding: 18px; }
+    .row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom: 12px; }
+    .col-2 { grid-column: span 2; }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-5 { grid-column: span 5; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    label { display: block; font-size: .9rem; color: #dbe4ef; margin-bottom: 6px; }
+    .help { font-size: .82rem; color: var(--muted); }
+    input, select, button {
+      width: 100%; border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+      border-radius: 12px; padding: 11px 12px; font: inherit;
+    }
+    button {
+      cursor: pointer; background: linear-gradient(180deg, rgba(129,230,217,.18), rgba(129,230,217,.10)); border-color: rgba(129,230,217,.35);
+    }
+    button.secondary { background: rgba(255,255,255,.03); border-color: var(--border); }
+    button.warn { background: linear-gradient(180deg, rgba(246,173,85,.18), rgba(246,173,85,.10)); border-color: rgba(246,173,85,.35); }
+    button.danger { background: linear-gradient(180deg, rgba(252,129,129,.18), rgba(252,129,129,.10)); border-color: rgba(252,129,129,.35); }
+    .table-wrap { overflow: auto; border: 1px solid rgba(255,255,255,.05); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 980px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,.06); text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-weight: 600; background: rgba(255,255,255,.02); position: sticky; top: 0; }
+    td input, td select { padding: 8px 9px; border-radius: 10px; }
+    .cell-actions { display: flex; gap: 8px; min-width: 130px; }
+    .chips { display:flex; gap:8px; flex-wrap: wrap; }
+    .chip {
+      padding: 7px 10px; border-radius: 999px; border:1px solid var(--border); background: rgba(255,255,255,.03); color: var(--muted);
+      user-select:none; font-size: .88rem;
+    }
+    .cards { display:grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .metric { border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: rgba(255,255,255,.025); }
+    .metric .k { color: var(--muted); font-size: .86rem; }
+    .metric .v { font-size: 1.35rem; margin-top: 6px; font-weight: 700; }
+    .metric .s { font-size: .83rem; color: var(--muted); margin-top: 4px; }
+    .advanced { margin-top: 10px; border:1px solid rgba(255,255,255,.06); border-radius: 16px; overflow: hidden; }
+    .advanced summary { list-style: none; cursor: pointer; padding: 14px 16px; background: rgba(255,255,255,.03); color: #d7e3ef; font-weight: 600; }
+    .advanced summary::-webkit-details-marker { display:none; }
+    .advanced .body { padding: 16px; }
+    .source-block { display: none; }
+    .source-block.active { display: block; }
+    .pill {
+      display:inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(23,26,33,.94); color: #fffb00; font-size: .8rem;
+      border:1px solid var(--border);
+    }
+    .note {
+      padding: 12px 14px; border-radius: 14px; background: rgba(246,173,85,.08); border: 1px solid rgba(246,173,85,.22); color: #fbd38d;
+      font-size: .9rem; line-height: 1.45;
+    }
+    .tiny { font-size: .82rem; color: var(--muted); }
+    .footer { margin-top: 16px; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+    .inline { display:flex; align-items:center; gap:8px; }
+    .muted { color: var(--muted); }
+    .good { color: var(--ok); }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero { flex-direction: column; }
+      .col-2, .col-3, .col-4, .col-5, .col-6, .col-8 { grid-column: span 12; }
+    }
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+      .wrap { padding: 14px; }
+      .panel .body, .panel .head { padding-left: 14px; padding-right: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1>Load First — Power Sizing Calculator</h1>
+        <p>Begin with demand, then size the source. This version is built to guide non-engineers with intelligent defaults while still giving professionals full control over surge, diversity, losses, and sizing assumptions.</p>
+      </div>
+      <div class="tag">⚡ Load first. Source second.</div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="head">
+          <h2>1) Project and load inputs</h2>
+          <p>Select a project type, apply a preset that scales realistic values, then edit anything you want.</p>
+        </div>
+        <div class="body">
+          <div class="row">
+            <div class="col-4">
+              <label>Project type</label>
+              <select id="projectType"></select>
+            </div>
+            <div class="col-4">
+              <label>Preset profile</label>
+              <select id="profilePreset"></select>
+            </div>
+            <div class="col-4">
+              <label>Power source path</label>
+              <select id="sourceType">
+                <option value="solar">Solar</option>
+                <option value="hydro">Hydro</option>
+                <option value="generator">Generator</option>
+                <option value="grid">Grid</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="chips" style="margin-bottom:12px;">
+            <div class="chip">Project type loads a full intelligent base table.</div>
+            <div class="chip">Preset profile scales those values realistically.</div>
+            <div class="chip">You can still edit, delete, or add more.</div>
+          </div>
+
+          <div class="row">
+            <div class="col-6">
+              <label>Add from preset appliance list</label>
+              <select id="presetLoadSelect"></select>
+            </div>
+            <div class="col-3">
+              <label>&nbsp;</label>
+              <button id="addPresetItemBtn">Add preset load</button>
+            </div>
+            <div class="col-3">
+              Add custom load manually
+              <div class="help">Use this when your appliance is not already in the preset list.</div>
+            
+          </div></div>
+
+          <div class="row">
+            <div class="col-2">
+              <label>Load name</label>
+              <input id="itemName" placeholder="e.g. CCTV" />
+            </div>
+            <div class="col-2">
+              <label>Qty</label>
+              <input id="itemQty" type="number" min="0" step="1" value="1" />
+            </div>
+            <div class="col-2">
+              <label>Watts</label>
+              <input id="itemWatts" type="number" min="0" step="0.1" placeholder="e.g. 750" />
+            </div>
+            <div class="col-2">
+              <label>Hours/day</label>
+              <input id="itemHours" type="number" min="0" step="0.1" placeholder="e.g. 2" />
+            </div>
+            <div class="col-2">
+              <label>Surge</label>
+              <input id="itemSurge" type="number" min="1" step="0.1" value="1" />
+            </div>
+            <div class="col-1">
+              <label>Diversity</label>
+              <input id="itemDiversity" type="number" min="0" max="1" step="0.01" value="1" />
+            </div>
+            <div class="col-1">
+              <label>&nbsp;</label>
+              <button id="addItemBtn">Add</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table id="loadsTable">
+              <thead>
+                <tr>
+                  <th>Load</th>
+                  <th>Qty</th>
+                  <th>Watts</th>
+                  <th>Hours/day</th>
+                  <th>Surge</th>
+                  <th>Diversity</th>
+                  <th>Connected W</th>
+                  <th>Diversified W</th>
+                  <th>Peak surge W</th>
+                  <th>Daily Wh</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <details class="advanced">
+            <summary>2) Advanced settings</summary>
+            <div class="body">
+              <div class="row">
+                <div class="col-3">
+                  <label>System voltage (V)</label>
+                  <input id="systemVoltage" type="number" min="12" step="1" value="24" />
+                </div>
+                <div class="col-3">
+                  <label>System losses (%)</label>
+                  <input id="lossPct" type="number" min="0" step="0.1" value="15" />
+                </div>
+                <div class="col-3">
+                  <label>Safety factor (%)</label>
+                  <input id="safetyPct" type="number" min="0" step="0.1" value="20" />
+                </div>
+                <div class="col-3">
+                  <label>Global diversity multiplier</label>
+                  <input id="globalDiversity" type="number" min="0.1" max="1.5" step="0.01" value="1" />
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-3">
+                  <label>Power factor</label>
+                  <input id="powerFactor" type="number" min="0.1" max="1" step="0.01" value="0.9" />
+                </div>
+                <div class="col-3">
+                  <label>Autonomy (days)</label>
+                  <input id="autonomyDays" type="number" min="0" step="0.1" value="1" />
+                </div>
+                <div class="col-3">
+                  <label>Battery DoD (%)</label>
+                  <input id="dodPct" type="number" min="1" max="100" step="1" value="80" />
+                </div>
+                <div class="col-3">
+                  <label>Inverter efficiency (%)</label>
+                  <input id="inverterEffPct" type="number" min="1" max="100" step="0.1" value="92" />
+                </div>
+              </div>
+              <div class="tiny">Per-appliance surge and diversity are already built into the table. These advanced settings let engineers tune whole-system assumptions without changing every row.</div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel" style="background: #03002b;">
+        <div class="head">
+          <h3>3) Results</h3>
+          <p>Demand summary first. Then source-specific guidance.</p>
+        </div>
+        <div class="body">
+          <div class="cards">
+            <div class="metric"><div class="k">Connected load</div><div class="v" id="connectedLoad">0 W</div><div class="s">Before diversity</div></div>
+            <div class="metric"><div class="k">Diversified load</div><div class="v" id="diversifiedLoad">0 W</div><div class="s">Per-row diversity + global multiplier</div></div>
+            <div class="metric"><div class="k">Peak startup load</div><div class="v" id="startupLoad">0 W</div><div class="s">Highest likely startup demand</div></div>
+            <div class="metric"><div class="k">Adjusted daily energy</div><div class="v" id="adjustedEnergy">0 Wh/day</div><div class="s">Losses + safety applied</div></div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px;">
+            <strong>Source sizing</strong>
+            <span class="pill" id="activeSourcePill">Solar path</span>
+          </div>
+
+          <div id="solarBlock" class="source-block active">
+            <div class="row" style="margin-top:12px;">
+              <div class="col-6">
+                <label>Peak sun hours</label>
+                <input id="solarPsh" type="number" min="1" step="0.1" value="5" />
+              </div>
+              <div class="col-6">
+                <label>PV design margin (%)</label>
+                <input id="solarMargin" type="number" min="0" step="0.1" value="20" />
+              </div>
+            </div>
+            <div class="cards">
+              <div class="metric"><div class="k">Recommended PV array</div><div class="v" id="solarArray">0 Wp</div><div class="s">Panel capacity target</div></div>
+              <div class="metric"><div class="k">Battery bank</div><div class="v" id="batteryBank">0 Ah</div><div class="s">At selected voltage and DoD</div></div>
+              <div class="metric"><div class="k">Inverter size</div><div class="v" id="inverterSize">0 VA</div><div class="s">Should ride through startup demand</div></div>
+              <div class="metric"><div class="k">Charge controller</div><div class="v" id="controllerSize">0 A</div><div class="s">Approximate DC controller current</div></div>
+            </div>
+          </div>
+
+          <div id="hydroBlock" class="source-block">
+            <div class="row" style="margin-top:12px;">
+              <div class="col-4"><label>Net head (m)</label><input id="hydroHead" type="number" min="0.1" step="0.1" value="10" /></div>
+              <div class="col-4"><label>Flow (L/s)</label><input id="hydroFlow" type="number" min="0.1" step="0.1" value="10" /></div>
+              <div class="col-4"><label>Overall efficiency (%)</label><input id="hydroEff" type="number" min="1" max="100" step="0.1" value="60" /></div>
+            </div>
+            <div class="cards">
+              <div class="metric"><div class="k">Hydro power potential</div><div class="v" id="hydroPower">0 W</div><div class="s">From head, flow and efficiency</div></div>
+              <div class="metric"><div class="k">Daily hydro energy</div><div class="v" id="hydroDaily">0 kWh/day</div><div class="s">Assumes continuous operation</div></div>
+              <div class="metric"><div class="k">Coverage against load</div><div class="v" id="hydroCoverage">0%</div><div class="s">Compared to adjusted daily energy</div></div>
+              <div class="metric"><div class="k">Suggested inverter / control</div><div class="v" id="hydroInverter">0 VA</div><div class="s">Based on diversified and startup load</div></div>
+            </div>
+          </div>
+
+          <div id="generatorBlock" class="source-block">
+            <div class="row" style="margin-top:12px;">
+              <div class="col-6"><label>Generator oversize (%)</label><input id="genOversize" type="number" min="0" step="0.1" value="25" /></div>
+              <div class="col-6"><label>Starting surge reserve (%)</label><input id="genSurge" type="number" min="0" step="0.1" value="20" /></div>
+            </div>
+            <div class="cards">
+              <div class="metric"><div class="k">Generator size</div><div class="v" id="genSize">0 kVA</div><div class="s">Recommended apparent power</div></div>
+              <div class="metric"><div class="k">Estimated running load</div><div class="v" id="genRun">0%</div><div class="s">When serving diversified demand</div></div>
+            </div>
+          </div>
+
+          <div id="gridBlock" class="source-block">
+            <div class="cards" style="margin-top:12px;">
+              <div class="metric"><div class="k">Service demand</div><div class="v" id="gridService">0 A</div><div class="s">Approx current at selected voltage</div></div>
+              <div class="metric"><div class="k">Suggested main breaker</div><div class="v" id="gridBreaker">0 A</div><div class="s">Rounded up standard size</div></div>
+            </div>
+          </div>
+
+          <div id="hybridBlock" class="source-block">
+            <div class="note" style="margin-top:12px;">Hybrid mode combines storage-side sizing with firm-source support. Use this for solar + grid, solar + generator, or hydro + battery concepts.</div>
+            <div class="cards" style="margin-top:12px;">
+              <div class="metric"><div class="k">Hybrid inverter</div><div class="v" id="hybridInverter">0 VA</div><div class="s">Based on diversified and startup demand</div></div>
+              <div class="metric"><div class="k">Recommended battery bank</div><div class="v" id="hybridBattery">0 Ah</div><div class="s">Storage side sizing</div></div>
+            </div>
+          </div>
+
+          <div class="footer" id="assumptionSummary"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const standardBreakerSizes = [6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
+    let loads = [];
+
+    const libraries = {
+      Home: [
+        { key:'ceiling_lights', name:'Ceiling lights', watts:15, hours:5, surge:1, diversity:1 },
+        { key:'wall_lights', name:'Wall lights', watts:10, hours:4, surge:1, diversity:1 },
+        { key:'outdoor_lights', name:'Outdoor/security lights', watts:20, hours:10, surge:1, diversity:1 },
+        { key:'socket_bedroom', name:'Socket group - bedroom', watts:1000, hours:3, surge:1.2, diversity:0.4 },
+        { key:'socket_living', name:'Socket group - living room', watts:1200, hours:4, surge:1.2, diversity:0.5 },
+        { key:'socket_kitchen', name:'Socket group - kitchen', watts:1500, hours:2, surge:1.3, diversity:0.6 },
+        { key:'tv', name:'TV', watts:100, hours:5, surge:1.1, diversity:0.8 },
+        { key:'fridge', name:'Fridge', watts:150, hours:10, surge:3, diversity:1 },
+        { key:'microwave', name:'Microwave', watts:1200, hours:0.5, surge:1.2, diversity:0.3 },
+        { key:'kettle', name:'Kettle', watts:2000, hours:0.3, surge:1, diversity:0.3 },
+        { key:'iron', name:'Iron box', watts:1000, hours:0.5, surge:1, diversity:0.3 },
+        { key:'washing_machine', name:'Washing machine', watts:500, hours:1, surge:2.5, diversity:0.4 },
+        { key:'instant_shower', name:'Instant shower', watts:3000, hours:0.5, surge:1, diversity:1 },
+        { key:'water_pump', name:'Water pump', watts:750, hours:1, surge:3.5, diversity:0.7 },
+        { key:'air_conditioner', name:'Air conditioner', watts:1200, hours:6, surge:3, diversity:0.6 }
+      ],
+      Office: [
+        { key:'office_lights', name:'Office lights', watts:18, hours:9, surge:1, diversity:1 },
+        { key:'security_lights', name:'Security lights', watts:20, hours:12, surge:1, diversity:1 },
+        { key:'socket_workstations', name:'Socket group - workstations', watts:1500, hours:8, surge:1.2, diversity:0.7 },
+        { key:'socket_reception', name:'Socket group - reception', watts:1000, hours:8, surge:1.2, diversity:0.6 },
+        { key:'socket_kitchenette', name:'Socket group - kitchenette', watts:1500, hours:2, surge:1.2, diversity:0.5 },
+        { key:'desktop', name:'Desktop computer', watts:200, hours:8, surge:1.1, diversity:0.8 },
+        { key:'laptop', name:'Laptop', watts:65, hours:7, surge:1.1, diversity:0.8 },
+        { key:'printer', name:'Printer', watts:120, hours:1, surge:2, diversity:0.3 },
+        { key:'router', name:'Router', watts:15, hours:12, surge:1, diversity:1 },
+        { key:'server', name:'Small server/NVR', watts:150, hours:24, surge:1.2, diversity:1 },
+        { key:'fridge', name:'Office fridge', watts:180, hours:10, surge:3, diversity:1 },
+        { key:'microwave', name:'Microwave', watts:1200, hours:0.5, surge:1.2, diversity:0.3 },
+        { key:'kettle', name:'Kettle', watts:2000, hours:0.3, surge:1, diversity:0.3 },
+        { key:'water_dispenser', name:'Water dispenser', watts:500, hours:4, surge:1.5, diversity:0.6 },
+        { key:'air_conditioner', name:'Air conditioner', watts:1500, hours:8, surge:3, diversity:0.8 }
+      ],
+      Shop: [
+        { key:'shop_lights', name:'Shop lights', watts:18, hours:10, surge:1, diversity:1 },
+        { key:'display_lights', name:'Display lights', watts:12, hours:10, surge:1, diversity:1 },
+        { key:'security_lights', name:'Security lights', watts:20, hours:12, surge:1, diversity:1 },
+        { key:'socket_front', name:'Socket group - front shop', watts:1000, hours:8, surge:1.2, diversity:0.6 },
+        { key:'socket_back', name:'Socket group - back room', watts:1000, hours:5, surge:1.2, diversity:0.5 },
+        { key:'pos', name:'POS / till', watts:80, hours:10, surge:1.1, diversity:1 },
+        { key:'printer', name:'Receipt printer', watts:50, hours:2, surge:1.2, diversity:0.5 },
+        { key:'router', name:'Router', watts:15, hours:12, surge:1, diversity:1 },
+        { key:'cctv', name:'CCTV / DVR', watts:100, hours:24, surge:1.1, diversity:1 },
+        { key:'tv', name:'TV / display screen', watts:100, hours:8, surge:1.1, diversity:0.8 },
+        { key:'fridge', name:'Display fridge', watts:200, hours:12, surge:3, diversity:1 },
+        { key:'freezer', name:'Freezer', watts:250, hours:12, surge:3, diversity:1 },
+        { key:'microwave', name:'Microwave', watts:1200, hours:0.4, surge:1.2, diversity:0.2 },
+        { key:'fan', name:'Fan', watts:75, hours:8, surge:1.5, diversity:0.8 },
+        { key:'air_conditioner', name:'Air conditioner', watts:1500, hours:8, surge:3, diversity:0.7 }
+      ],
+      Farm: [
+        { key:'yard_lights', name:'Yard lights', watts:20, hours:10, surge:1, diversity:1 },
+        { key:'security_lights', name:'Security lights', watts:20, hours:12, surge:1, diversity:1 },
+        { key:'house_socket_group', name:'Socket group - farmhouse', watts:1200, hours:4, surge:1.2, diversity:0.5 },
+        { key:'office_socket_group', name:'Socket group - office/store', watts:1200, hours:6, surge:1.2, diversity:0.5 },
+        { key:'fridge', name:'Fridge', watts:180, hours:10, surge:3, diversity:1 },
+        { key:'freezer', name:'Freezer', watts:250, hours:12, surge:3, diversity:1 },
+        { key:'water_pump', name:'Water pump', watts:750, hours:2, surge:3.5, diversity:0.9 },
+        { key:'borehole_pump', name:'Borehole pump', watts:1500, hours:2, surge:4, diversity:0.9 },
+        { key:'milk_cooler', name:'Milk cooler', watts:1200, hours:8, surge:3, diversity:0.8 },
+        { key:'chaff_cutter', name:'Chaff cutter', watts:2200, hours:1, surge:3, diversity:0.4 },
+        { key:'incubator', name:'Incubator', watts:150, hours:24, surge:1.2, diversity:1 },
+        { key:'brooder', name:'Brooder / heat lamp', watts:250, hours:12, surge:1, diversity:0.8 },
+        { key:'milking_machine', name:'Milking machine', watts:800, hours:2, surge:2.5, diversity:0.7 },
+        { key:'router', name:'Router', watts:15, hours:12, surge:1, diversity:1 },
+        { key:'cctv', name:'CCTV / DVR', watts:100, hours:24, surge:1.1, diversity:1 }
+      ],
+      Custom: [
+        { key:'lighting_group', name:'Lighting group', watts:15, hours:6, surge:1, diversity:1 },
+        { key:'general_socket_group', name:'General socket group', watts:1200, hours:3, surge:1.2, diversity:0.5 },
+        { key:'motor_load', name:'Motor load', watts:750, hours:2, surge:3, diversity:0.8 },
+        { key:'electronics', name:'Electronics group', watts:150, hours:8, surge:1.1, diversity:0.8 },
+        { key:'heating_load', name:'Heating load', watts:1000, hours:1, surge:1, diversity:0.5 },
+        { key:'cooling_load', name:'Cooling load', watts:1200, hours:6, surge:3, diversity:0.6 },
+        { key:'pump_load', name:'Pump load', watts:750, hours:1, surge:3.5, diversity:0.7 },
+        { key:'fridge_like', name:'Fridge-like load', watts:150, hours:10, surge:3, diversity:1 },
+        { key:'tv_like', name:'TV / media load', watts:100, hours:5, surge:1.1, diversity:0.8 },
+        { key:'computer_like', name:'Computer load', watts:200, hours:8, surge:1.1, diversity:0.7 },
+        { key:'router_like', name:'Router / network load', watts:15, hours:24, surge:1, diversity:1 },
+        { key:'security_like', name:'Security system', watts:100, hours:24, surge:1.1, diversity:1 },
+        { key:'water_heating', name:'Water heating load', watts:3000, hours:0.5, surge:1, diversity:0.5 },
+        { key:'kitchen_appliance', name:'Kitchen appliance', watts:1500, hours:0.5, surge:1.2, diversity:0.3 },
+        { key:'reserve_slot', name:'Reserve / spare load', watts:500, hours:1, surge:1.2, diversity:0.3 }
+      ]
+    };
+
+    const projectProfiles = {
+      Home: {
+        'Bedsitter': {
+          ceiling_lights: { qty: 1 },
+          wall_lights: { qty: 0 },
+          outdoor_lights: { qty: 0 },
+          socket_bedroom: { name:'Socket group - bed area', qty: 1, watts: 800, diversity: 0.4 },
+          socket_living: { qty: 0 },
+          socket_kitchen: { name:'Socket group - kitchen area', qty: 1, watts: 1200, diversity: 0.5 },
+          tv: { qty: 1, watts: 100, hours: 4 },
+          fridge: { qty: 1 },
+          microwave: { qty: 0 },
+          kettle: { qty: 1, hours: 0.2 },
+          iron: { qty: 0 },
+          washing_machine: { qty: 0 },
+          instant_shower: { qty: 1, watts: 3000, hours: 0.4 },
+          water_pump: { qty: 0 },
+          air_conditioner: { qty: 0 }
+        },
+        '1 Bedroom': {
+          ceiling_lights: { qty: 2 },
+          wall_lights: { qty: 2 },
+          outdoor_lights: { qty: 1 },
+          socket_bedroom: { qty: 1 },
+          socket_living: { qty: 1 },
+          socket_kitchen: { qty: 1 },
+          tv: { qty: 1 },
+          fridge: { qty: 1 },
+          microwave: { qty: 0 },
+          kettle: { qty: 1 },
+          iron: { qty: 1, hours: 0.3 },
+          washing_machine: { qty: 0 },
+          instant_shower: { qty: 1 },
+          water_pump: { qty: 0 },
+          air_conditioner: { qty: 0 }
+        },
+        '2 Bedroom': {
+          ceiling_lights: { qty: 3 },
+          wall_lights: { qty: 2 },
+          outdoor_lights: { qty: 1 },
+          socket_bedroom: { qty: 2 },
+          socket_living: { qty: 1 },
+          socket_kitchen: { qty: 1 },
+          tv: { qty: 1 },
+          fridge: { qty: 1 },
+          microwave: { qty: 1 },
+          kettle: { qty: 1 },
+          iron: { qty: 1 },
+          washing_machine: { qty: 0 },
+          instant_shower: { qty: 1 },
+          water_pump: { qty: 0 },
+          air_conditioner: { qty: 0 }
+        },
+        '3 Bedroom': {
+          ceiling_lights: { qty: 4 },
+          wall_lights: { qty: 4 },
+          outdoor_lights: { qty: 2 },
+          socket_bedroom: { qty: 3 },
+          socket_living: { qty: 1 },
+          socket_kitchen: { qty: 1 },
+          tv: { qty: 2 },
+          fridge: { qty: 1 },
+          microwave: { qty: 1 },
+          kettle: { qty: 1 },
+          iron: { qty: 1 },
+          washing_machine: { qty: 1 },
+          instant_shower: { qty: 2 },
+          water_pump: { qty: 1, hours: 0.6 },
+          air_conditioner: { qty: 0 }
+        },
+        '4 Bedroom': {
+          ceiling_lights: { qty: 5 },
+          wall_lights: { qty: 5 },
+          outdoor_lights: { qty: 3 },
+          socket_bedroom: { qty: 4 },
+          socket_living: { qty: 2 },
+          socket_kitchen: { qty: 1 },
+          tv: { qty: 2 },
+          fridge: { qty: 1 },
+          microwave: { qty: 1 },
+          kettle: { qty: 1 },
+          iron: { qty: 1 },
+          washing_machine: { qty: 1 },
+          instant_shower: { qty: 3 },
+          water_pump: { qty: 1 },
+          air_conditioner: { qty: 1, hours: 5 }
+        },
+        '5 Bedroom': {
+          ceiling_lights: { qty: 6 },
+          wall_lights: { qty: 6 },
+          outdoor_lights: { qty: 4 },
+          socket_bedroom: { qty: 5 },
+          socket_living: { qty: 2 },
+          socket_kitchen: { qty: 2 },
+          tv: { qty: 3 },
+          fridge: { qty: 1 },
+          microwave: { qty: 1 },
+          kettle: { qty: 1 },
+          iron: { qty: 1 },
+          washing_machine: { qty: 1 },
+          instant_shower: { qty: 4 },
+          water_pump: { qty: 1 },
+          air_conditioner: { qty: 2 }
+        },
+        '6 Bedroom Mansion': {
+          ceiling_lights: { qty: 8 },
+          wall_lights: { qty: 8 },
+          outdoor_lights: { qty: 6 },
+          socket_bedroom: { qty: 6 },
+          socket_living: { qty: 3 },
+          socket_kitchen: { qty: 2 },
+          tv: { qty: 4 },
+          fridge: { qty: 2, watts: 180 },
+          microwave: { qty: 2 },
+          kettle: { qty: 2 },
+          iron: { qty: 2 },
+          washing_machine: { qty: 1 },
+          instant_shower: { qty: 5 },
+          water_pump: { qty: 1, hours: 1 },
+          air_conditioner: { qty: 3 }
+        }
+      },
+      Office: {
+        'Reception Office': {
+          office_lights:{qty:6}, security_lights:{qty:1}, socket_workstations:{qty:2}, socket_reception:{qty:1}, socket_kitchenette:{qty:1}, desktop:{qty:0}, laptop:{qty:3}, printer:{qty:1}, router:{qty:1}, server:{qty:0}, fridge:{qty:1}, microwave:{qty:0}, kettle:{qty:1}, water_dispenser:{qty:1}, air_conditioner:{qty:0}
+        },
+        'Standard Office': {
+          office_lights:{qty:12}, security_lights:{qty:2}, socket_workstations:{qty:5}, socket_reception:{qty:1}, socket_kitchenette:{qty:1}, desktop:{qty:2}, laptop:{qty:8}, printer:{qty:1}, router:{qty:1}, server:{qty:1}, fridge:{qty:1}, microwave:{qty:1}, kettle:{qty:1}, water_dispenser:{qty:1}, air_conditioner:{qty:1}
+        },
+        'Large Office': {
+          office_lights:{qty:20}, security_lights:{qty:3}, socket_workstations:{qty:10}, socket_reception:{qty:2}, socket_kitchenette:{qty:2}, desktop:{qty:5}, laptop:{qty:20}, printer:{qty:2}, router:{qty:2}, server:{qty:2}, fridge:{qty:1}, microwave:{qty:1}, kettle:{qty:2}, water_dispenser:{qty:2}, air_conditioner:{qty:2}
+        }
+      },
+      Shop: {
+        'Kiosk / Small Shop': {
+          shop_lights:{qty:4}, display_lights:{qty:2}, security_lights:{qty:1}, socket_front:{qty:1}, socket_back:{qty:0}, pos:{qty:1}, printer:{qty:1}, router:{qty:1}, cctv:{qty:1}, tv:{qty:0}, fridge:{qty:0}, freezer:{qty:0}, microwave:{qty:0}, fan:{qty:1}, air_conditioner:{qty:0}
+        },
+        'Retail Shop': {
+          shop_lights:{qty:10}, display_lights:{qty:4}, security_lights:{qty:2}, socket_front:{qty:2}, socket_back:{qty:1}, pos:{qty:1}, printer:{qty:1}, router:{qty:1}, cctv:{qty:1}, tv:{qty:1}, fridge:{qty:1}, freezer:{qty:0}, microwave:{qty:0}, fan:{qty:2}, air_conditioner:{qty:0}
+        },
+        'Shop + Cold Storage': {
+          shop_lights:{qty:12}, display_lights:{qty:4}, security_lights:{qty:2}, socket_front:{qty:2}, socket_back:{qty:1}, pos:{qty:1}, printer:{qty:1}, router:{qty:1}, cctv:{qty:1}, tv:{qty:1}, fridge:{qty:1}, freezer:{qty:1}, microwave:{qty:1}, fan:{qty:2}, air_conditioner:{qty:1}
+        }
+      },
+      Farm: {
+        'Small Farm': {
+          yard_lights:{qty:3}, security_lights:{qty:2}, house_socket_group:{qty:1}, office_socket_group:{qty:0}, fridge:{qty:1}, freezer:{qty:0}, water_pump:{qty:1}, borehole_pump:{qty:0}, milk_cooler:{qty:0}, chaff_cutter:{qty:0}, incubator:{qty:0}, brooder:{qty:0}, milking_machine:{qty:0}, router:{qty:1}, cctv:{qty:1}
+        },
+        'Irrigation Farm': {
+          yard_lights:{qty:3}, security_lights:{qty:2}, house_socket_group:{qty:1}, office_socket_group:{qty:1}, fridge:{qty:1}, freezer:{qty:0}, water_pump:{qty:1}, borehole_pump:{qty:1}, milk_cooler:{qty:0}, chaff_cutter:{qty:0}, incubator:{qty:0}, brooder:{qty:0}, milking_machine:{qty:0}, router:{qty:1}, cctv:{qty:1}
+        },
+        'Mixed Farm': {
+          yard_lights:{qty:5}, security_lights:{qty:3}, house_socket_group:{qty:1}, office_socket_group:{qty:1}, fridge:{qty:1}, freezer:{qty:1}, water_pump:{qty:1}, borehole_pump:{qty:1}, milk_cooler:{qty:1}, chaff_cutter:{qty:1}, incubator:{qty:1}, brooder:{qty:1}, milking_machine:{qty:1}, router:{qty:1}, cctv:{qty:1}
+        }
+      },
+      Custom: {
+        'Starter': {
+          lighting_group:{qty:1}, general_socket_group:{qty:1}, motor_load:{qty:0}, electronics:{qty:1}, heating_load:{qty:0}, cooling_load:{qty:0}, pump_load:{qty:0}, fridge_like:{qty:0}, tv_like:{qty:1}, computer_like:{qty:1}, router_like:{qty:1}, security_like:{qty:0}, water_heating:{qty:0}, kitchen_appliance:{qty:0}, reserve_slot:{qty:0}
+        }
+      }
+    };
+
+    function round(num, digits = 1) {
+      const p = Math.pow(10, digits);
+      return Math.round(num * p) / p;
+    }
+    function formatWh(wh) {
+      if (wh >= 1000) return `${round(wh/1000, 2)} kWh/day`;
+      return `${round(wh, 0)} Wh/day`;
+    }
+    function formatPower(w) {
+      if (w >= 1000) return `${round(w/1000, 2)} kW`;
+      return `${round(w, 0)} W`;
+    }
+    function nextBreakerSize(a) {
+      return standardBreakerSizes.find(s => s >= a) || Math.ceil(a / 50) * 50;
+    }
+    function assumptions() {
+      return {
+        voltage: Number($('systemVoltage').value || 24),
+        lossPct: Number($('lossPct').value || 15),
+        safetyPct: Number($('safetyPct').value || 20),
+        globalDiversity: Number($('globalDiversity').value || 1),
+        pf: Number($('powerFactor').value || 0.9),
+        autonomyDays: Number($('autonomyDays').value || 1),
+        dodPct: Number($('dodPct').value || 80),
+        inverterEffPct: Number($('inverterEffPct').value || 92)
+      };
+    }
+
+    function currentProjectType() { return $('projectType').value; }
+    function currentSource() { return $('sourceType').value; }
+
+    function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+    function getLibrary(projectType) { return clone(libraries[projectType] || []); }
+
+    function populateProjectTypes() {
+      $('projectType').innerHTML = Object.keys(libraries).map(k => `<option>${k}</option>`).join('');
+    }
+
+    function populateProfilePresets() {
+      const type = currentProjectType();
+      const profiles = Object.keys(projectProfiles[type] || {});
+      $('profilePreset').innerHTML = profiles.map(p => `<option>${p}</option>`).join('');
+    }
+
+    function populatePresetLoadSelect() {
+      const type = currentProjectType();
+      const list = libraries[type] || [];
+      $('presetLoadSelect').innerHTML = '<option value="">Select preset appliance…</option>' +
+        list.map(item => `<option value="${item.key}">${item.name}</option>`).join('');
+    }
+
+    function buildBaseLoads() {
+      const type = currentProjectType();
+      loads = getLibrary(type).map(item => ({ ...item, qty: 0 }));
+    }
+
+    function applyProfile() {
+      const type = currentProjectType();
+      const profileName = $('profilePreset').value;
+      const profile = projectProfiles[type]?.[profileName] || {};
+      buildBaseLoads();
+      loads = loads.map(row => {
+        const config = profile[row.key] || {};
+        return {
+          ...row,
+          ...config,
+          qty: config.qty !== undefined ? config.qty : row.qty
+        };
+      });
+      recalc();
+    }
+
+    function renderTable() {
+      const tbody = $('loadsTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      loads.forEach((l, idx) => {
+        const connected = l.qty * l.watts;
+        const diversified = connected * l.diversity;
+        const surgeW = l.qty * l.watts * l.surge;
+        const dailyWh = l.qty * l.watts * l.hours;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${l.name}</td>
+          <td><input type="number" min="0" step="1" value="${l.qty}" data-field="qty" data-idx="${idx}"></td>
+          <td><input type="number" min="0" step="0.1" value="${l.watts}" data-field="watts" data-idx="${idx}"></td>
+          <td><input type="number" min="0" step="0.1" value="${l.hours}" data-field="hours" data-idx="${idx}"></td>
+          <td><input type="number" min="1" step="0.1" value="${l.surge}" data-field="surge" data-idx="${idx}"></td>
+          <td><input type="number" min="0" max="1" step="0.01" value="${l.diversity}" data-field="diversity" data-idx="${idx}"></td>
+          <td>${round(connected,1)}</td>
+          <td>${round(diversified,1)}</td>
+          <td>${round(surgeW,1)}</td>
+          <td>${round(dailyWh,1)}</td>
+          <td>
+            <div class="cell-actions">
+              <button class="secondary" data-edit="${idx}">Edit</button>
+              <button class="danger" data-del="${idx}">Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('input[data-field]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const idx = Number(inp.dataset.idx);
+          const field = inp.dataset.field;
+          let value = Number(inp.value);
+          if (field === 'qty') value = Math.max(0, Math.round(value));
+          if (field === 'diversity') value = Math.min(1, Math.max(0, value));
+          if (field === 'surge') value = Math.max(1, value);
+          if (field === 'watts' || field === 'hours') value = Math.max(0, value);
+          loads[idx][field] = value;
+          recalc();
+        });
+      });
+
+      tbody.querySelectorAll('button[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          loads.splice(Number(btn.dataset.del), 1);
+          recalc();
+        });
+      });
+
+      tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item = loads[Number(btn.dataset.edit)];
+          $('itemName').value = item.name;
+          $('itemQty').value = item.qty;
+          $('itemWatts').value = item.watts;
+          $('itemHours').value = item.hours;
+          $('itemSurge').value = item.surge;
+          $('itemDiversity').value = item.diversity;
+        });
+      });
+    }
+
+    function addCustomItem(item) {
+      if (!item.name) return;
+      loads.push(item);
+      recalc();
+    }
+
+    $('addItemBtn').addEventListener('click', () => {
+      addCustomItem({
+        key: `custom_${Date.now()}`,
+        name: $('itemName').value.trim(),
+        qty: Number($('itemQty').value || 1),
+        watts: Number($('itemWatts').value || 0),
+        hours: Number($('itemHours').value || 0),
+        surge: Number($('itemSurge').value || 1),
+        diversity: Number($('itemDiversity').value || 1)
+      });
+      $('itemName').value = '';
+      $('itemQty').value = 1;
+      $('itemWatts').value = '';
+      $('itemHours').value = '';
+      $('itemSurge').value = 1;
+      $('itemDiversity').value = 1;
+    });
+
+    $('addPresetItemBtn').addEventListener('click', () => {
+      const key = $('presetLoadSelect').value;
+      if (!key) return;
+      const type = currentProjectType();
+      const item = (libraries[type] || []).find(x => x.key === key);
+      if (!item) return;
+      addCustomItem({ ...clone(item), qty: 1, key: `${item.key}_${Date.now()}` });
+      $('presetLoadSelect').value = '';
+    });
+
+    $('projectType').addEventListener('change', () => {
+      populateProfilePresets();
+      populatePresetLoadSelect();
+      applyProfile();
+    });
+
+    $('profilePreset').addEventListener('change', applyProfile);
+
+    $('sourceType').addEventListener('change', () => {
+      document.querySelectorAll('.source-block').forEach(el => el.classList.remove('active'));
+      const src = currentSource();
+      const map = { solar:'solarBlock', hydro:'hydroBlock', generator:'generatorBlock', grid:'gridBlock', hybrid:'hybridBlock' };
+      $(map[src]).classList.add('active');
+      $('activeSourcePill').textContent = `${src.charAt(0).toUpperCase() + src.slice(1)} path`;
+      recalc();
+    });
+
+    document.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input', recalc);
+      el.addEventListener('change', recalc);
+    });
+
+    function recalc() {
+      const a = assumptions();
+      const connected = loads.reduce((s,l) => s + l.qty * l.watts, 0);
+      const diversified = loads.reduce((s,l) => s + l.qty * l.watts * l.diversity, 0) * a.globalDiversity;
+      const startupLoad = loads.length ? Math.max(...loads.map(l => l.qty * l.watts * l.surge)) : 0;
+      const rawDaily = loads.reduce((s,l) => s + l.qty * l.watts * l.hours, 0);
+      const adjustedDaily = rawDaily * (1 + a.lossPct/100) * (1 + a.safetyPct/100);
+      const designPeak = Math.max(diversified * (1 + a.safetyPct/100), startupLoad);
+      const apparentVA = designPeak / Math.max(0.1, a.pf);
+      const inverterBase = apparentVA * 1.15;
+
+      $('connectedLoad').textContent = formatPower(connected);
+      $('diversifiedLoad').textContent = formatPower(diversified);
+      $('startupLoad').textContent = formatPower(startupLoad);
+      $('adjustedEnergy').textContent = formatWh(adjustedDaily);
+
+      const psh = Number($('solarPsh').value || 5);
+      const solarMargin = Number($('solarMargin').value || 20);
+      const pvArray = psh > 0 ? adjustedDaily / psh * (1 + solarMargin/100) : 0;
+      const batteryWh = adjustedDaily * a.autonomyDays / Math.max(0.01, a.dodPct/100) / Math.max(0.01, a.inverterEffPct/100);
+      const batteryAh = batteryWh / Math.max(1, a.voltage);
+      const controllerA = pvArray / Math.max(1, a.voltage);
+      $('solarArray').textContent = `${round(pvArray, 0)} Wp`;
+      $('batteryBank').textContent = `${round(batteryAh, 0)} Ah`;
+      $('inverterSize').textContent = `${round(inverterBase, 0)} VA`;
+      $('controllerSize').textContent = `${round(controllerA, 0)} A`;
+
+      const head = Number($('hydroHead').value || 10);
+      const flowLs = Number($('hydroFlow').value || 10);
+      const hydroEff = Number($('hydroEff').value || 60) / 100;
+      const hydroPower = 1000 * 9.81 * (flowLs/1000) * head * hydroEff;
+      const hydroDailyWh = hydroPower * 24;
+      const hydroCoverage = adjustedDaily > 0 ? (hydroDailyWh / adjustedDaily) * 100 : 0;
+      $('hydroPower').textContent = `${round(hydroPower, 0)} W`;
+      $('hydroDaily').textContent = `${round(hydroDailyWh/1000, 2)} kWh/day`;
+      $('hydroCoverage').textContent = `${round(hydroCoverage, 1)}%`;
+      $('hydroInverter').textContent = `${round(inverterBase, 0)} VA`;
+
+      const genOversize = Number($('genOversize').value || 25);
+      const genSurge = Number($('genSurge').value || 20);
+      const genKVA = (Math.max(apparentVA, startupLoad / Math.max(0.1, a.pf)) * (1 + genOversize/100) * (1 + genSurge/100))/1000;
+      const genRunPct = genKVA > 0 ? (apparentVA / (genKVA * 1000))*100 : 0;
+      $('genSize').textContent = `${round(genKVA, 2)} kVA`;
+      $('genRun').textContent = `${round(genRunPct, 0)}%`;
+
+      const gridA = apparentVA / Math.max(1, a.voltage);
+      const mainBreaker = nextBreakerSize(gridA * 1.25);
+      $('gridService').textContent = `${round(gridA, 1)} A`;
+      $('gridBreaker').textContent = `${mainBreaker} A`;
+
+      $('hybridInverter').textContent = `${round(inverterBase, 0)} VA`;
+      $('hybridBattery').textContent = `${round(batteryAh, 0)} Ah`;
+
+      $('assumptionSummary').textContent = `Assumptions: ${a.voltage} V system • losses ${a.lossPct}% • safety ${a.safetyPct}% • global diversity ${a.globalDiversity} • PF ${a.pf} • autonomy ${a.autonomyDays} day(s) • DoD ${a.dodPct}% • inverter efficiency ${a.inverterEffPct}%. Per-row surge and diversity remain editable in the load table.`;
+
+      renderTable();
+    }
+
+    populateProjectTypes();
+    populateProfilePresets();
+    populatePresetLoadSelect();
+    applyProfile();
+  </script>
+</body>
+</html>
